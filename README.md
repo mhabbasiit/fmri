@@ -336,7 +336,7 @@ nvidia-smi  # For GPU usage
 ## Authors / Version
 
 **Author:** Mohammad H. Abbasi (mabbasi@stanford.edu)  
-**Lab:** Stanford University, STAI Lab (https://stai.stanford.edu)  
+Stanford University, STAI Lab (https://stai.stanford.edu)  
 **Created:** 2025 | **Version:** 1.0.0 | **Last update:** September 15, 2025
 
 ## Acknowledgements
