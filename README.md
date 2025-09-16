@@ -322,40 +322,30 @@ python pipeline_runner.py --mode single --subject SUB_ID --cpu-only
 
 For detailed quality assessment, review the fMRIPrep HTML reports located at `derivatives/fmriprep/sub-XXXX.html`. Key areas to check:
 
-### **1. 🧠 Brain Mask & Segmentation**
+### **1. Brain Mask & Segmentation**
 - **Red line:** Should outline the brain (not skull/dura)
 - **Blue line:** Should separate white and grey matter  
 - **Check:** No brain tissue cutoff
 
-### **2. 📍 Spatial Normalization**
+### **2. Spatial Normalization**
 - **Ventricles:** Should be aligned between subject and template
 - **White/grey matter boundaries:** Should match
 - **Check:** No stretching or distortion
 
-### **3. 🧲 Fieldmap Correction**
+### **3. Fieldmap Correction**
 - **Before/after:** Compare images before and after correction
 - **Frontal area:** Check distortion correction
 - **Check:** Normal brain shape after correction
 
-### **4. 🎯 Functional-Anatomical Alignment**
+### **4. Functional-Anatomical Alignment**
 - **Red line:** Should align with grey/white matter boundary
 - **Fixed/Moving:** No distortion between images
 - **Check:** Proper surface registration
 
-### **5. 🎭 CompCor ROIs**
+### **5. CompCor ROIs**
 - **Red line (brain mask):** Should cover full brain
 - **Magenta line:** Inside white matter and CSF
 - **Blue lines:** In high CSF or blood flow areas
-
-### **6. 📊 BOLD Summary**
-- **Spikes:** Check for spikes in 5 plots
-- **Mean FD (purple line):** Should be < 0.5 (flag if > 0.5)
-- **Errors:** Review any processing errors
-
-### **🚨 Key QC Criteria:**
-- **Mean FD < 0.5 mm:** Acceptable quality
-- **Mean FD > 0.5 mm:** Needs flagging or exclusion
-- **Access path:** `derivatives/fmriprep/sub-XXXX.html`
 
 ---
 
