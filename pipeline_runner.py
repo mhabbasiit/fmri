@@ -125,6 +125,33 @@ class FMRIPipelineRunner:
         """Check if subject processing is complete (reports + logs)"""
         return self.has_subject_reports(subject) and self.log_indicates_success(subject)
         
+    def check_and_run_connectivity(self, subject):
+        """Check if connectivity needs to be generated for completed subjects"""
+        if not GENERATE_CONNECTIVITY:
+            return False
+            
+        if not self.is_subject_completed(subject):
+            return False
+            
+        # Check if connectivity already exists
+        conn_dir = os.path.join(CONNECTIVITY_OUTPUT_DIR, f"sub-{subject}")
+        if os.path.exists(conn_dir):
+            conn_files = [f for f in os.listdir(conn_dir) if f.endswith('_connectivity.csv')]
+            if conn_files:
+                self.logger.debug(f"Connectivity matrices already exist for {subject}")
+                return False
+        
+        # Generate connectivity matrices
+        self.logger.info(f"🔗 Generating connectivity matrices for completed subject: {subject}")
+        success = self.generate_connectivity_matrices(subject)
+        
+        if success:
+            self.logger.info(f"✅ Connectivity generation completed for {subject}")
+        else:
+            self.logger.error(f"❌ Connectivity generation failed for {subject}")
+            
+        return success
+        
     def cleanup_work_directory(self, subject):
         """Clean up work directory for completed subject"""
         self.logger.info(f"🧹 Cleaning work for {subject}...")
@@ -318,6 +345,12 @@ class FMRIPipelineRunner:
             time.sleep(3)
             
         self.logger.info(f"All {len(subjects_to_process)} subjects launched successfully")
+        
+        # Check for connectivity generation after launching
+        if GENERATE_CONNECTIVITY:
+            self.logger.info("🔗 Checking for completed subjects to generate connectivity matrices...")
+            for subject in subjects_to_process:
+                self.check_and_run_connectivity(subject)
                 
     def run_parallel_processing(self):
         """Run parallel processing with queue management"""
@@ -364,12 +397,25 @@ class FMRIPipelineRunner:
             
         self.logger.info(f"Launched {completed} subjects")
         
+        # After launching all subjects, check for connectivity generation
+        if GENERATE_CONNECTIVITY:
+            self.logger.info("🔗 Checking for completed subjects to generate connectivity matrices...")
+            all_subjects = self.get_subject_list()
+            for subject in all_subjects:
+                self.check_and_run_connectivity(subject)
+        
     def run_watch_mode(self):
         """Run in watch mode - continuously process queue"""
         self.logger.info("Starting watch mode...")
         
         try:
             while True:
+                # Check for completed subjects that need connectivity generation
+                if GENERATE_CONNECTIVITY:
+                    all_subjects = self.get_subject_list()
+                    for subject in all_subjects:
+                        self.check_and_run_connectivity(subject)
+                
                 # Get next subject from file
                 subjects = self.get_subject_list()
                 if not subjects:
