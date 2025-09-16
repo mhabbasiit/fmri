@@ -320,7 +320,7 @@ python pipeline_runner.py --mode single --subject SUB_ID --cpu-only
 
 ## fMRIPrep HTML Report Manual Review Guidelines
 
-For detailed quality assessment, review the fMRIPrep HTML reports located at `derivatives/fmriprep/sub-XXXX.html`. Key areas to check:
+For detailed quality assessment, review the fMRIPrep HTML reports. Key areas to check:
 
 ### **1. Brain Mask & Segmentation**
 - **Red line:** Should outline the brain (not skull/dura)
