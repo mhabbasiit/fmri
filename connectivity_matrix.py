@@ -13,6 +13,7 @@ Purpose:
 
 import os
 import sys
+import glob
 import numpy as np
 import pandas as pd
 from nilearn import datasets, input_data, connectome
@@ -23,7 +24,6 @@ import nibabel as nib
 import logging
 from datetime import datetime
 from pathlib import Path
-import glob
 
 # Import configuration
 try:
@@ -123,23 +123,86 @@ class ConnectivityProcessor:
         return masker
 
     def find_fmriprep_files(self, subject):
-        """Find fMRIPrep output files for a subject"""
+        """Find fMRIPrep output files for a subject (uses config-based structure handling)"""
         subject_dir = os.path.join(OUTPUT_DIR, f"sub-{subject}")
         
-        # Find preprocessed BOLD files
-        bold_pattern = os.path.join(subject_dir, "func", "*_desc-preproc_bold.nii.gz")
-        bold_files = glob.glob(bold_pattern)
+        if not os.path.exists(subject_dir):
+            raise FileNotFoundError(f"Subject directory not found: {subject_dir}")
         
-        # Find confounds files
-        confounds_pattern = os.path.join(subject_dir, "func", "*_desc-confounds_timeseries.tsv")
-        confounds_files = glob.glob(confounds_pattern)
+        bold_files = []
+        confounds_files = []
+        
+        if HANDLE_SESSIONS:
+            # Check for session-based structure
+            sessions = [d for d in os.listdir(subject_dir) 
+                       if d.startswith(SESSION_PREFIX) and os.path.isdir(os.path.join(subject_dir, d))]
+            
+            if sessions:
+                # Session-based structure
+                self.logger.info(f"Found session-based structure for {subject}: {sessions}")
+                for session in sessions:
+                    session_func_dir = os.path.join(subject_dir, session, "func")
+                    if os.path.exists(session_func_dir):
+                        bold_pattern = os.path.join(session_func_dir, f"*{REQUIRED_BOLD_SUFFIX}")
+                        confounds_pattern = os.path.join(session_func_dir, f"*{REQUIRED_CONFOUNDS_SUFFIX}")
+                        session_bold = glob.glob(bold_pattern)
+                        session_confounds = glob.glob(confounds_pattern)
+                        
+                        # Filter by minimum time points if configured
+                        if USE_LARGEST_FILE and MIN_TIME_POINTS > 0:
+                            session_bold = self._filter_by_time_points(session_bold, "BOLD", MIN_TIME_POINTS)
+                            session_confounds = self._filter_by_time_points(session_confounds, "confounds", MIN_TIME_POINTS)
+                        
+                        bold_files.extend(session_bold)
+                        confounds_files.extend(session_confounds)
+                        self.logger.info(f"Session {session}: {len(session_bold)} BOLD files, {len(session_confounds)} confound files")
+            else:
+                # Non-session-based structure
+                self.logger.info(f"Using non-session-based structure for {subject}")
+                func_dir = os.path.join(subject_dir, "func")
+                if os.path.exists(func_dir):
+                    bold_pattern = os.path.join(func_dir, f"*{REQUIRED_BOLD_SUFFIX}")
+                    confounds_pattern = os.path.join(func_dir, f"*{REQUIRED_CONFOUNDS_SUFFIX}")
+                    bold_files = glob.glob(bold_pattern)
+                    confounds_files = glob.glob(confounds_pattern)
+        else:
+            # Force non-session-based structure
+            self.logger.info(f"Using non-session-based structure for {subject} (HANDLE_SESSIONS=False)")
+            func_dir = os.path.join(subject_dir, "func")
+            if os.path.exists(func_dir):
+                bold_pattern = os.path.join(func_dir, f"*{REQUIRED_BOLD_SUFFIX}")
+                confounds_pattern = os.path.join(func_dir, f"*{REQUIRED_CONFOUNDS_SUFFIX}")
+                bold_files = glob.glob(bold_pattern)
+                confounds_files = glob.glob(confounds_pattern)
         
         if not bold_files:
             raise FileNotFoundError(f"No preprocessed BOLD files found for {subject}")
         if not confounds_files:
             raise FileNotFoundError(f"No confounds files found for {subject}")
             
+        self.logger.info(f"Found {len(bold_files)} BOLD files and {len(confounds_files)} confound files for {subject}")
         return bold_files, confounds_files
+
+    def _filter_by_time_points(self, file_list, file_type, min_time_points):
+        """Filter files by minimum time points requirement"""
+        filtered_files = []
+        for file_path in file_list:
+            try:
+                if file_type == "BOLD":
+                    img = nib.load(file_path)
+                    num_time_points = img.shape[3] if len(img.shape) == 4 else 0
+                else:  # confounds
+                    confounds = pd.read_csv(file_path, delimiter="\t")
+                    num_time_points = len(confounds)
+                
+                if num_time_points >= min_time_points:
+                    filtered_files.append(file_path)
+                else:
+                    self.logger.warning(f"Skipping {file_path}: {num_time_points} < {min_time_points} time points")
+            except Exception as e:
+                self.logger.warning(f"Could not read {file_path}: {e}")
+        
+        return filtered_files
 
     def _get_largest_file(self, file_list, file_type="BOLD"):
         """Get file with most time points"""
@@ -249,6 +312,15 @@ class ConnectivityProcessor:
                     continue
                     
             self.logger.info(f"Completed connectivity processing for {subject}")
+
+            # Generate visualizations for all connectivity matrices
+            self.logger.info(f"Creating visualizations for {subject}")
+            viz_success = create_subject_visualizations(subject)
+            if viz_success:
+                self.logger.info(f"✅ Successfully created visualizations for {subject}")
+            else:
+                self.logger.warning(f"⚠️ Failed to create some visualizations for {subject}")
+
             return True
             
         except Exception as e:
@@ -322,3 +394,114 @@ def main():
 if __name__ == '__main__':
     main()
 
+
+
+def create_connectivity_visualization(matrix_file, output_dir, atlas_name, connectivity_type, subject):
+    """Create visualization for a connectivity matrix"""
+    try:
+        # Import matplotlib here to avoid conflicts
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        
+        # Load connectivity matrix
+        connectivity_df = pd.read_csv(matrix_file, index_col=0)
+        connectivity_matrix = connectivity_df.values
+        labels = connectivity_df.columns.tolist()
+        
+        # Create figure with subplots (1x2 layout)
+        fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+        fig.suptitle(f'Connectivity Analysis: {subject} ({atlas_name.upper()} - {connectivity_type})', 
+                     fontsize=16, fontweight='bold')
+        
+        # 1. Full connectivity matrix heatmap
+        ax1 = axes[0]
+        im1 = ax1.imshow(connectivity_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
+        ax1.set_title('Full Connectivity Matrix')
+        ax1.set_xlabel('Brain Regions')
+        ax1.set_ylabel('Brain Regions')
+        plt.colorbar(im1, ax=ax1, fraction=0.046, pad=0.04)
+        
+        # 2. Distribution of connectivity values
+        ax2 = axes[1]
+        # Get lower triangle values (excluding diagonal)
+        mask_lower = np.tril(np.ones_like(connectivity_matrix), k=-1).astype(bool)
+        connectivity_values = connectivity_matrix[mask_lower]
+        
+        ax2.hist(connectivity_values, bins=50, alpha=0.7, color='steelblue', edgecolor='black')
+        ax2.axvline(np.mean(connectivity_values), color='red', linestyle='--', 
+                    label=f'Mean: {np.mean(connectivity_values):.3f}')
+        ax2.axvline(np.median(connectivity_values), color='orange', linestyle='--', 
+                    label=f'Median: {np.median(connectivity_values):.3f}')
+        ax2.set_title('Distribution of Connectivity Values')
+        ax2.set_xlabel('Connectivity Strength')
+        ax2.set_ylabel('Frequency')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        # Add statistics text
+        stats_text = f"""Statistics:
+Mean: {np.mean(connectivity_values):.4f}
+Std: {np.std(connectivity_values):.4f}
+Strong (>0.5): {np.sum(connectivity_values > 0.5)} ({100*np.sum(connectivity_values > 0.5)/len(connectivity_values):.1f}%)
+Weak (<0.1): {np.sum(connectivity_values < 0.1)} ({100*np.sum(connectivity_values < 0.1)/len(connectivity_values):.1f}%)"""
+        
+        ax2.text(0.02, 0.98, stats_text, transform=ax2.transAxes, fontsize=10,
+                 verticalalignment='top', fontfamily='monospace',
+                 bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+        
+        # Adjust layout and save
+        plt.tight_layout()
+        
+        # Save visualization
+        output_file = os.path.join(output_dir, f"{subject}_{atlas_name}_{connectivity_type}_visualization.png")
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"✅ Saved visualization: {output_file}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error creating visualization: {e}")
+        return False
+
+def create_subject_visualizations(subject):
+    """Create visualizations for all connectivity matrices of a subject"""
+    subject_dir = os.path.join(CONNECTIVITY_OUTPUT_DIR, f"sub-{subject}")
+    
+    if not os.path.exists(subject_dir):
+        print(f"❌ Subject directory not found: {subject_dir}")
+        return False
+    
+    # Find all connectivity matrix files
+    matrix_files = [f for f in os.listdir(subject_dir) if f.endswith('_connectivity.csv')]
+    
+    if not matrix_files:
+        print(f"❌ No connectivity matrices found for {subject}")
+        return False
+    
+    print(f"📊 Creating visualizations for {len(matrix_files)} connectivity matrices for {subject}")
+    
+    success_count = 0
+    for matrix_file in matrix_files:
+        matrix_path = os.path.join(subject_dir, matrix_file)
+        
+        # Parse filename to extract atlas and connectivity type
+        # Format: sub-{subject}_{atlas}_{connectivity_type}_connectivity.csv
+        parts = matrix_file.replace('.csv', '').split('_')
+        if len(parts) >= 4:
+            atlas_name = parts[-3]
+            connectivity_type = parts[-2]
+            
+            print(f"  🎨 Creating visualization for {atlas_name} - {connectivity_type}")
+            
+            if create_connectivity_visualization(matrix_path, subject_dir, atlas_name, 
+                                               connectivity_type, subject):
+                success_count += 1
+    
+    print(f"✅ Created {success_count}/{len(matrix_files)} visualizations for {subject}")
+    return success_count > 0
+
+if __name__ == '__main__':
+    main()
