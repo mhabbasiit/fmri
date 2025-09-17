@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-fMRI Pipeline Configuration
+fMRI Pipeline Configuration 
 ===========================
 Contains all settings for the fMRI preprocessing pipeline using fMRIPrep.
 
 Author: Mohammad Abbasi (mabbasi@stanford.edu)
-Based on ADNI-FMRI pipeline configuration
 """
 
 import os
