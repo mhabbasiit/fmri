@@ -66,19 +66,19 @@ The pipeline is **config-driven** with minimal CLI flags for convenience.
 
 ## Processing Pipeline
 
-### 1) Setup & Prerequisites Check — `launcher.sh --check`
+### 1) Setup & Prerequisites Check, `launcher.sh --check`
 ```bash
 ./launcher.sh --check
 ```
 
-### 2) Subject Discovery — `subject_manager.py`
+### 2) Subject Discovery, `subject_manager.py`
 ```bash
 python subject_manager.py --action discover --output subjects.txt
 python subject_manager.py --action add --subjects sub-01 sub-02
 python subject_manager.py --action remove --subjects sub-01
 ```
 
-### 3) fMRI Preprocessing — `pipeline_runner.py`
+### 3) fMRI Preprocessing, `pipeline_runner.py`
 **Includes automatic connectivity generation and visualization.**
 
 Runs fMRIPrep with:
@@ -100,7 +100,7 @@ python pipeline_runner.py --mode watch
 
 **Note:** All modes automatically include connectivity generation and visualization unless disabled with `--no-connectivity` flag.
 
-### 4) Connectivity Matrix Generation + Visualization — `connectivity_matrix.py`
+### 4) Connectivity Matrix Generation + Visualization, `connectivity_matrix.py`
 Automatically runs after successful fMRIPrep completion (if `GENERATE_CONNECTIVITY = True`).
 
 - Extracts timeseries using multiple atlases (AAL, Harvard-Oxford, Schaefer, etc.)
@@ -121,7 +121,7 @@ python run_connectivity.py --all-completed --atlases aal harvard_oxford
 
 **Note:** When using `pipeline_runner.py`, connectivity generation (including visualization) happens automatically after each subject completes fMRIPrep successfully.
 
-### 5) Quality Control — `fmri_qc.py`
+### 5) Quality Control, `fmri_qc.py`
 - Extracts **framewise displacement (FD)** and motion metrics  
 - Computes: Mean FD, Max FD, High-Motion Ratio, Volumes  
 - Labels runs as **PASS / REVIEW / FAIL**  
@@ -360,7 +360,7 @@ For detailed quality assessment, review the fMRIPrep HTML reports. Key areas to 
 
 ## Authors / Version
 **Author:** Mohammad H. Abbasi (mabbasi@stanford.edu)  
-Stanford University, STAI Lab — [https://stai.stanford.edu](https://stai.stanford.edu)  
+Stanford University, STAI Lab, [https://stai.stanford.edu](https://stai.stanford.edu)  
 **Created:** 2025 | **Version:** 1.0.0 | **Last update:** September 16, 2025  
 
 ---
