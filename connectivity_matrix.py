@@ -147,10 +147,7 @@ class ConnectivityProcessor:
                         session_bold = glob.glob(bold_pattern)
                         session_confounds = glob.glob(confounds_pattern)
                         
-                        # Filter by minimum time points if configured
-                        if USE_LARGEST_FILE and MIN_TIME_POINTS > 0:
-                            session_bold = self._filter_by_time_points(session_bold, "BOLD", MIN_TIME_POINTS)
-                            session_confounds = self._filter_by_time_points(session_confounds, "confounds", MIN_TIME_POINTS)
+                        # Skip early filtering - let _pairs_by_session handle min_tp filtering during matching
                         
                         bold_files.extend(session_bold)
                         confounds_files.extend(session_confounds)
@@ -231,22 +228,33 @@ class ConnectivityProcessor:
         else:
             raise Exception(f"No suitable {file_type} file found")
 
-    def _pairs_by_session(self, subject, bold_files, confounds_files, min_tp=50):
+    def _pairs_by_session(self, subject, bold_files, confounds_files, min_tp=MIN_TIME_POINTS):
         """
         Find all valid BOLD/confounds pairs organized by session.
         Returns: dict like {'ses-01': [ {bold, conf, n_tp, mean_fd, task, run, dir}, ... ], 'nosession': [...]}
         """
         import re
-        # Index confounds by common stem
+        
+        # Normalize filename keys for robust BOLD↔️confounds matching
+        def norm_key(name):
+            """Remove space/res/part/echo tags that appear in BOLD but not confounds"""
+            name = re.sub(r"_space-[^_]+", "", name)
+            name = re.sub(r"_res-[^_]+",   "", name)
+            name = re.sub(r"_part-[^_]+",  "", name)
+            name = re.sub(r"_echo-[^_]+",  "", name)
+            return name
+        
+        # Index confounds by normalized stem
         conf_idx = {
-            os.path.basename(c).replace("_desc-confounds_timeseries.tsv", ""): c
+            norm_key(os.path.basename(c).replace("_desc-confounds_timeseries.tsv", "")): c
             for c in confounds_files
         }
         sessions = {}
 
         for b in bold_files:
             stem = os.path.basename(b).replace("_desc-preproc_bold.nii.gz", "")
-            c = conf_idx.get(stem)
+            stem_key = norm_key(stem)
+            c = conf_idx.get(stem_key)
             if not c:
                 continue
 
@@ -265,7 +273,8 @@ class ConnectivityProcessor:
                 n_bold = nib.load(b).shape[3]
                 dfc = pd.read_csv(c, sep="\t")
                 n_conf = len(dfc)
-                if n_bold != n_conf or n_bold < min_tp:
+                # Allow 1 TR difference (due to non-steady-state removal or trimming)
+                if abs(n_bold - n_conf) > 1 or n_bold < min_tp:
                     continue
                 # Use already loaded dataframe for mean_fd calculation
                 fd = pd.to_numeric(dfc.get("framewise_displacement"), errors="coerce").dropna()
@@ -390,15 +399,15 @@ def main():
     parser.add_argument('--subjects', nargs='+', help='List of subject IDs to process')
     parser.add_argument('--subjects-file', help='File containing subject IDs (one per line)')
     parser.add_argument('--atlases', nargs='+', 
-                       default=['aal', 'schaefer-100'], 
-                       choices=['aal', 'difumo-256', 'difumo-1024', 'harvard_oxford', 'schaefer-100', 'schaefer-400'],
+                       default=DEFAULT_ATLASES, 
+                       choices=AVAILABLE_ATLASES,
                        help='Atlas names for parcellation')
     parser.add_argument('--confounds', nargs='+', 
-                       default=["csf", "white_matter", "global_signal", "trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z"],
+                       default=DEFAULT_CONFOUNDS,
                        help='Confound regressors to remove')
     parser.add_argument('--corr-kinds', nargs='+', 
-                       default=['full-corr'],
-                       choices=['full-corr', 'partial-corr', 'tangent', 'covariance'],
+                       default=DEFAULT_CONNECTIVITY_TYPES,
+                       choices=AVAILABLE_CONNECTIVITY_TYPES,
                        help='Types of connectivity matrices')
     parser.add_argument('--parallel', action='store_true',
                        help='Process subjects in parallel')
