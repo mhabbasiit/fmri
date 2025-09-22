@@ -8,7 +8,7 @@ Date: September 15, 2025
 
 Purpose:
     This module processes pre-processed images from fMRIPrep and generates connectivity
-    matrices based on specified atlas parcellation. Integrated with fMRI pipeline config.
+    matrices based on the specified atlas parcellation. Integrated with fMRI pipeline config.
 """
 
 import os
@@ -17,7 +17,6 @@ import glob
 import numpy as np
 import pandas as pd
 from nilearn import datasets, input_data, connectome
-from nilearn.interfaces.fmriprep import load_confounds
 from nilearn.maskers import NiftiMapsMasker, NiftiLabelsMasker
 import argparse
 import nibabel as nib
@@ -232,6 +231,60 @@ class ConnectivityProcessor:
         else:
             raise Exception(f"No suitable {file_type} file found")
 
+    def _pairs_by_session(self, subject, bold_files, confounds_files, min_tp=50):
+        """
+        Find all valid BOLD/confounds pairs organized by session.
+        Returns: dict like {'ses-01': [ {bold, conf, n_tp, mean_fd, task, run, dir}, ... ], 'nosession': [...]}
+        """
+        import re
+        # Index confounds by common stem
+        conf_idx = {
+            os.path.basename(c).replace("_desc-confounds_timeseries.tsv", ""): c
+            for c in confounds_files
+        }
+        sessions = {}
+
+        for b in bold_files:
+            stem = os.path.basename(b).replace("_desc-preproc_bold.nii.gz", "")
+            c = conf_idx.get(stem)
+            if not c:
+                continue
+
+            # Extract metadata from filename
+            def meta(k, default="unknown"):
+                m = re.search(fr"{k}-(\w+)", stem)
+                return m.group(1) if m else default
+
+            sess = meta("ses", "nosession")
+            sess_tag = sess if (sess == "nosession" or sess.startswith("ses-")) else f"ses-{sess}"
+            task = meta("task")
+            run  = meta("run")
+            pe   = meta("dir")
+
+            try:
+                n_bold = nib.load(b).shape[3]
+                dfc = pd.read_csv(c, sep="\t")
+                n_conf = len(dfc)
+                if n_bold != n_conf or n_bold < min_tp:
+                    continue
+                # Use already loaded dataframe for mean_fd calculation
+                fd = pd.to_numeric(dfc.get("framewise_displacement"), errors="coerce").dropna()
+                mean_fd = float(fd.mean()) if len(fd) else np.inf
+            except Exception:
+                continue
+
+            sessions.setdefault(sess_tag, []).append({
+                "bold": b, "conf": c, "n_tp": n_bold, "mean_fd": mean_fd,
+                "task": task, "run": run, "dir": pe
+            })
+
+        return sessions
+
+    def _select_best_run(self, candidates):
+        """Select best run in a session: highest n_tp; tie-break by lowest meanFD"""
+        return sorted(candidates, key=lambda x: (-x["n_tp"], x["mean_fd"]))[0]
+
+
     def process_subject_connectivity(self, subject, atlases, confounds_list, corr_kinds):
         """Process connectivity matrices for a single subject"""
         self.logger.info(f"Processing connectivity for subject {subject}")
@@ -240,76 +293,81 @@ class ConnectivityProcessor:
             # Find fMRIPrep output files
             bold_files, confounds_files = self.find_fmriprep_files(subject)
             
-            # Select files with most time points
-            fmri_file = self._get_largest_file(bold_files, "BOLD")
-            confounds_file = self._get_largest_file(confounds_files, "confounds")
+            # Get all valid session pairs
+            sess_map = self._pairs_by_session(subject, bold_files, confounds_files,
+                                              min_tp=MIN_TIME_POINTS if MIN_TIME_POINTS > 0 else 1)
+            if not sess_map:
+                self.logger.error("No valid BOLD↔️confounds pairs found")
+                return False
             
             # Create subject output directory
             subject_conn_dir = os.path.join(self.connectivity_dir, f"sub-{subject}")
             os.makedirs(subject_conn_dir, exist_ok=True)
             
-            # Load confounds
-            confounds_df = pd.read_csv(confounds_file, delimiter="\t")
-            self.logger.info(f"Loaded confounds: {confounds_df.shape}")
-            
-            # Check if all requested confounds exist
-            available_confounds = [col for col in confounds_list if col in confounds_df.columns]
-            missing_confounds = [col for col in confounds_list if col not in confounds_df.columns]
-            
-            if missing_confounds:
-                self.logger.warning(f"Missing confounds for {subject}: {missing_confounds}")
+            # Process each session
+            for sess, cands in sess_map.items():
+                best = self._select_best_run(cands)   # Each session gets only one run
                 
-            if not available_confounds:
-                self.logger.error(f"No valid confounds found for {subject}")
-                return False
+                self.logger.info(f"Processing session {sess} for {subject}: {best['task']}-{best['run']} ({best['n_tp']} timepoints, meanFD={best['mean_fd']:.3f})")
                 
-            confounds_array = confounds_df[available_confounds].fillna(0).to_numpy()
-            
-            # Process each atlas
-            for atlas_name, (atlas_map, labels) in atlases.items():
-                self.logger.info(f"Processing {subject} with {atlas_name} atlas")
-                
-                try:
-                    # Create masker and extract time series
-                    masker = self._get_masker(atlas_name, atlas_map)
-                    time_series = masker.fit_transform(fmri_file, confounds=confounds_array)
-                    
-                    self.logger.info(f"Extracted time series: {time_series.shape}")
-                    
-                    # Save time series
-                    timeseries_file = os.path.join(subject_conn_dir, f"sub-{subject}_{atlas_name}_timeseries.csv")
-                    pd.DataFrame(time_series).to_csv(timeseries_file, index=False)
-                    self.logger.info(f"Saved time series: {timeseries_file}")
-                    
-                    # Generate connectivity matrices
-                    for corr_kind in corr_kinds:
-                        try:
-                            self.logger.info(f"Computing {corr_kind} connectivity")
-                            corr_method = self._get_correlation(corr_kind)
-                            
-                            correlation_measure = connectome.ConnectivityMeasure(kind=corr_method)
-                            correlation_matrix = correlation_measure.fit_transform([time_series])[0]
-                            
-                            # Save connectivity matrix
-                            matrix_file = os.path.join(subject_conn_dir, 
-                                                     f"sub-{subject}_{atlas_name}_{corr_kind}_connectivity.csv")
-                            
-                            # Create DataFrame with labels if available
-                            if len(labels) == correlation_matrix.shape[0]:
-                                matrix_df = pd.DataFrame(correlation_matrix, index=labels, columns=labels)
-                            else:
-                                matrix_df = pd.DataFrame(correlation_matrix)
-                                
-                            matrix_df.to_csv(matrix_file)
-                            self.logger.info(f"Saved connectivity matrix: {matrix_file}")
-                            
-                        except Exception as e:
-                            self.logger.error(f"Failed to compute {corr_kind} for {subject}/{atlas_name}: {e}")
-                            continue
-                            
-                except Exception as e:
-                    self.logger.error(f"Failed to process {atlas_name} for {subject}: {e}")
+                # Load available confounds
+                conf_df = pd.read_csv(best["conf"], sep="\t")
+                available = [c for c in confounds_list if c in conf_df.columns]
+                if not available:
+                    self.logger.error(f"No valid confounds in session {sess} for {subject}")
                     continue
+                    
+                missing_confounds = [c for c in confounds_list if c not in conf_df.columns]
+                if missing_confounds:
+                    self.logger.warning(f"Missing confounds for {subject} session {sess}: {missing_confounds}")
+                    
+                conf_arr = conf_df[available].fillna(0).to_numpy()
+                
+                # Process each atlas
+                for atlas_name, (atlas_map, labels) in atlases.items():
+                    self.logger.info(f"Processing {subject} session {sess} with {atlas_name} atlas")
+                    
+                    try:
+                        masker = self._get_masker(atlas_name, atlas_map)
+                        ts = masker.fit_transform(best["bold"], confounds=conf_arr)
+                        
+                        self.logger.info(f"Extracted time series: {ts.shape}")
+                        
+                        base = (f"sub-{subject}_{sess}_task-{best['task']}"
+                                f"_dir-{best['dir']}_run-{best['run']}_{atlas_name}")
+                        
+                        # Save time series
+                        ts_path = os.path.join(subject_conn_dir, f"{base}_timeseries.csv")
+                        pd.DataFrame(ts).to_csv(ts_path, index=False)
+                        self.logger.info(f"Saved time series: {ts_path}")
+                        
+                        # Generate connectivity matrices
+                        for kind in corr_kinds:
+                            self.logger.info(f"Computing {kind} connectivity")
+                            
+                            cm = connectome.ConnectivityMeasure(
+                                kind=self._get_correlation(kind),
+                                vectorize=False,
+                                discard_diagonal=False
+                            )
+                            mat = cm.fit_transform([ts])[0]
+                            
+                            # Create DataFrame with proper labels if available
+                            if len(labels) == mat.shape[0]:
+                                df = pd.DataFrame(mat, index=labels, columns=labels)
+                            else:
+                                df = pd.DataFrame(mat)
+                                
+                            conn_path = os.path.join(subject_conn_dir, f"{base}_{kind}_connectivity.csv")
+                            if os.path.exists(conn_path):
+                                self.logger.info(f"Exists, skip: {conn_path}")
+                                continue
+                            df.to_csv(conn_path)
+                            self.logger.info(f"Saved connectivity matrix: {conn_path}")
+                            
+                    except Exception as e:
+                        self.logger.error(f"Error processing {atlas_name} atlas for {subject} session {sess}: {e}")
+                        continue
                     
             self.logger.info(f"Completed connectivity processing for {subject}")
 
@@ -403,7 +461,6 @@ def create_connectivity_visualization(matrix_file, output_dir, atlas_name, conne
         import matplotlib
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
-        import seaborn as sns
         
         # Load connectivity matrix
         connectivity_df = pd.read_csv(matrix_file, index_col=0)
@@ -455,7 +512,8 @@ Weak (<0.1): {np.sum(connectivity_values < 0.1)} ({100*np.sum(connectivity_value
         plt.tight_layout()
         
         # Save visualization
-        output_file = os.path.join(output_dir, f"{subject}_{atlas_name}_{connectivity_type}_visualization.png")
+        base_name = os.path.basename(matrix_file).replace("_connectivity.csv", "_visualization.png")
+        output_file = os.path.join(output_dir, base_name)
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
         
