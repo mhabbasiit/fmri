@@ -8,7 +8,7 @@ Date: September 15, 2025
 
 Purpose:
     This module processes pre-processed images from fMRIPrep and generates connectivity
-    matrices based on the specified atlas parcellation. Integrated with fMRI pipeline config.
+    matrices based on specified atlas parcellation. Integrated with fMRI pipeline config.
 """
 
 import os
@@ -52,7 +52,7 @@ def setup_logging():
 class ConnectivityProcessor:
     def __init__(self):
         self.logger = setup_logging()
-        self.connectivity_dir = os.path.join(OUTPUT_DIR, "connectivity_matrices")
+        self.connectivity_dir = CONNECTIVITY_OUTPUT_DIR
         os.makedirs(self.connectivity_dir, exist_ok=True)
         
     def fetch_atlases(self, atlas_names):
