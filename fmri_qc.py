@@ -78,14 +78,14 @@ class FMRIQualityControl:
             # Check for non-session based structure
             func_dir = os.path.join(subject_dir, "func")
             if os.path.exists(func_dir):
-                sessions = ["func"]  # Use "func" as session name for non-session data
+                sessions = ["nosession"]  # Use "nosession" as session name for non-session data
         
         sessions.sort()
         return sessions
 
     def find_best_confounds_file(self, subject, session):
         """Find confounds file with most volumes (>50) for a subject/session"""
-        if session == "func":
+        if session == "nosession":
             # Non-session based
             func_dir = os.path.join(self.output_dir, f"sub-{subject}", "func")
         else:
@@ -258,14 +258,23 @@ class FMRIQualityControl:
         report_filename = f"sub-{subject}_ses-{session}_qc.html"
         report_path = os.path.join(self.subjects_dir, report_filename)
         
-        # Check for connectivity matrices
+        # Check for connectivity matrices (filter by session)
         connectivity_subj_dir = os.path.join(self.connectivity_dir, f"sub-{subject}")
         connectivity_files = []
         visualization_files = []
         
         if os.path.exists(connectivity_subj_dir):
-            connectivity_files = glob.glob(os.path.join(connectivity_subj_dir, "*_connectivity.csv"))
-            visualization_files = glob.glob(os.path.join(connectivity_subj_dir, "*_visualization.png"))
+            all_connectivity_files = glob.glob(os.path.join(connectivity_subj_dir, "*_connectivity.csv"))
+            all_visualization_files = glob.glob(os.path.join(connectivity_subj_dir, "*_visualization.png"))
+            
+            # Filter files to only include those from this specific session
+            if session != "nosession":
+                session_pattern = f"_ses-{session}_"
+            else:
+                session_pattern = "_nosession_"
+            
+            connectivity_files = [f for f in all_connectivity_files if session_pattern in os.path.basename(f)]
+            visualization_files = [f for f in all_visualization_files if session_pattern in os.path.basename(f)]
         
         # Check for fMRIPrep HTML report
         fmriprep_html = os.path.join(self.output_dir, f"sub-{subject}.html")
@@ -390,17 +399,19 @@ class FMRIQualityControl:
             <p style="color: #e74c3c;">No connectivity matrices found</p>
 """
 
-        # Add visualizations
+        # Add visualizations for this specific session only
         if visualization_files:
             html_content += f"""
-            <h3>Connectivity Visualizations</h3>
+            <h3>Connectivity Visualizations (Session {session})</h3>
 """
             for viz_file in visualization_files:
                 viz_rel_path = os.path.relpath(viz_file, self.subjects_dir)
                 viz_name = os.path.basename(viz_file).replace('_visualization.png', '')
+                # Clean up the display name - remove subject prefix and session info
+                display_name = viz_name.replace(f'sub-{subject}_{session}_', '').replace('_', ' ').title()
                 html_content += f"""
             <div class="connectivity-viz">
-                <h4>{viz_name}</h4>
+                <h4 style="margin: 15px 0; color: #34495e;">{display_name}</h4>
                 <img src="{viz_rel_path}" alt="Connectivity Matrix Visualization" onclick="openModal(this.src, this.alt)">
             </div>
 """
@@ -413,20 +424,31 @@ class FMRIQualityControl:
             <h3>Time Series Data</h3>
 """
 
-        # Add time series files
+        # Add time series files for this specific session only
         if os.path.exists(connectivity_subj_dir):
-            timeseries_files = glob.glob(os.path.join(connectivity_subj_dir, "*_timeseries.csv"))
+            all_timeseries_files = glob.glob(os.path.join(connectivity_subj_dir, "*_timeseries.csv"))
+            
+            # Filter timeseries files for this session
+            if session != "nosession":
+                session_pattern = f"_ses-{session}_"
+            else:
+                session_pattern = "_nosession_"
+            timeseries_files = [f for f in all_timeseries_files if session_pattern in os.path.basename(f)]
+            
             if timeseries_files:
+                html_content += f"<h4 style='margin-top: 15px; color: #2c3e50;'>Time Series Files (Session {session})</h4>"
                 html_content += "<ul class='file-list'>"
                 for ts_file in timeseries_files:
                     ts_rel_path = os.path.relpath(ts_file, self.subjects_dir)
                     filename = os.path.basename(ts_file)
+                    # Clean up display name - remove subject and session prefix
+                    display_name = filename.replace(f'sub-{subject}_{session}_', '').replace('_', ' ')
                     html_content += f"""
-                    <li><a href="{ts_rel_path}" target="_blank">{filename}</a></li>
+                    <li><a href="{ts_rel_path}" target="_blank">{display_name}</a></li>
 """
                 html_content += "</ul>"
             else:
-                html_content += "<p style='color: #e74c3c;'>No time series files found</p>"
+                html_content += "<p style='color: #e74c3c;'>No time series files found for this session</p>"
 
         html_content += f"""
         </div>
