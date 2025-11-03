@@ -395,8 +395,14 @@ Stanford University, STAI Lab, [https://stai.stanford.edu](https://stai.stanford
 ---
 
 ## Acknowledgements
-Thanks to the **fMRIPrep** team, **Nilearn** contributors, and the broader **neuroimaging community**.  
-Special credit to the **STAI Lab** for extending QC, connectivity, and pipeline management.
+Thanks to the **fMRIPrep** team, **Nilearn** contributors, and the broader **neuroimaging community**  
+for developing the foundational tools that made this pipeline possible.  
+
+Special appreciation to the **Stanford Translational AI Lab (STAI Lab)** for extending the QC, connectivity,  
+and pipeline management components.  
+
+Sincere thanks to **Favour Nerrise** and **Karan Singh** for their valuable feedback, collaboration,  
+and continuous contributions to improving the pipeline.
 
 
 ---
