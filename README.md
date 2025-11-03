@@ -2,7 +2,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17516368.svg)](https://doi.org/10.5281/zenodo.17516368)
 
 Developed at the [Stanford Translational AI Lab (STAI)](https://stai.stanford.edu)  
-**Lead Developer:** Mohammad Hassan Abbasi  
+**Lead Developer:** Mohammad H. Abbasi  
 **Supervisor:** Ehsan Adeli 
 
 A lightweight, end-to-end pipeline for fMRI preprocessing using **fMRIPrep** with parallel processing, connectivity matrix generation, CPU/GPU flexibility, and comprehensive quality control.
