@@ -1,5 +1,5 @@
 # fMRI Processing Pipeline
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17516368.svg)](https://doi.org/10.5281/zenodo.17516368)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17503176.svg)](https://doi.org/10.5281/zenodo.17503176)
 
 Developed at the [Stanford Translational AI Lab (STAI)](https://stai.stanford.edu)  
 **Lead Developer:** Mohammad H. Abbasi  
