@@ -9,7 +9,8 @@ Configurable helper for post-processing preprocessed fMRIPrep outputs with:
 This script is intended for dataset-specific or experimental runs that
 need manual control beyond the main pipeline runner.
 
-Author: Mohammad Hassan Abbasi (mabbasi@stanford.edu), Favour Nerrise (fnerrise@stanford.edu), Karan Singth (karanps@stanford.edu)
+Author: Mohammad Hassan Abbasi (mabbasi@stanford.edu), Favour Nerrise (fnerrise@stanford.edu)
+Updated by: Karan Singth (karanps@stanford.edu)
 Last updated: November 2025
 
 Example:
