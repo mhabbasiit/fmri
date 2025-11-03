@@ -397,3 +397,32 @@ Stanford University, STAI Lab, [https://stai.stanford.edu](https://stai.stanford
 ## Acknowledgements
 Thanks to the **fMRIPrep** team, **Nilearn** contributors, and the broader **neuroimaging community**.  
 Special credit to the **STAI Lab** for extending QC, connectivity, and pipeline management.
+
+
+---
+
+## Citation
+*(short version)*  
+> Abbasi, M.H., & Adeli, E. (2025). *fMRI Processing Pipeline.* Zenodo.  
+> DOI: [10.5281/zenodo.17516368](https://doi.org/10.5281/zenodo.17516368)
+
+---
+
+## How to Cite This Work
+If you use this pipeline in your research, please cite it as follows:
+
+> **Abbasi, M.H.**, & **Adeli, E.** (2025). *fMRI Processing Pipeline: A lightweight, end-to-end framework for BIDS-compatible fMRI preprocessing and quality control.*  
+> Stanford Translational AI Lab, Stanford University. Zenodo.  
+> [https://doi.org/10.5281/zenodo.17516368](https://doi.org/10.5281/zenodo.17516368)
+
+```bibtex
+@software{abbasi2025fmri,
+  author       = {Mohammad Hassan Abbasi and Ehsan Adeli},
+  title        = {fMRI Processing Pipeline: A lightweight, end-to-end framework for BIDS-compatible fMRI preprocessing and quality control},
+  year         = {2025},
+  institution  = {Stanford Translational AI Lab, Stanford University},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.17516368},
+  url          = {https://doi.org/10.5281/zenodo.17516368}
+}
+```
