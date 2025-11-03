@@ -121,6 +121,29 @@ python run_connectivity.py --all-completed --atlases aal harvard_oxford
 
 **Note:** When using `pipeline_runner.py`, connectivity generation (including visualization) happens automatically after each subject completes fMRIPrep successfully.
 
+### 4.1) Special Parcellation Helper (parcellation_helper_special.py)
+A lightweight helper script for dataset-specific or experimental post-processing cases (e.g., multi-session datasets or special connectivity analyses).
+This script extends the main pipeline by supporting:
+
+- Automatic selection of the best fMRI run per subject (based on number of timepoints)
+- Multi-session handling
+- Optional fast I/O by copying large files to local temporary storage
+- Connectivity matrix generation across multiple atlases (e.g., DiFuMo, AAL, Harvard-Oxford)
+
+This script is intended for special use cases that require manual control beyond the main pipeline_runner.py.
+It is fully compatible with outputs from fMRIPrep and saves timeseries and connectivity matrices in the same standardized format as the main pipeline.
+```bash
+python scripts/parcellation_helper_special.py \
+    --atlases difumo-1024 \
+    --subjects_file subjects.txt \
+    --root_dir /path/to/bids/derivatives \
+    --save_dir /path/to/connectivity \
+    --use-temp-storage \
+    --temp-dir /tmp/fmri_fastio
+```
+
+
+
 ### 5) Quality Control, `fmri_qc.py`
 - Extracts **framewise displacement (FD)** and motion metrics  
 - Computes: Mean FD, Max FD, High-Motion Ratio, Volumes  
