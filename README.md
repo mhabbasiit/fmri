@@ -410,7 +410,7 @@ and continuous contributions to improving the pipeline.
 ## Citation
 *(short version)*  
 > Abbasi, M.H., & Adeli, E. (2025). *fMRI Processing Pipeline.* Zenodo.  
-> DOI: [10.5281/zenodo.17516368](https://doi.org/10.5281/zenodo.17516368)
+> DOI: [10.5281/zenodo.17503176](https://doi.org/10.5281/zenodo.17503176)
 
 ---
 
