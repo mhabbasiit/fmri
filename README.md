@@ -410,7 +410,7 @@ and continuous contributions to improving the pipeline.
 ## Citation
 *(short version)*  
 > Abbasi, M.H., & Adeli, E. (2025). *fMRI Processing Pipeline.* Zenodo.  
-> DOI: [10.5281/zenodo.17503176](https://doi.org/10.5281/zenodo.17503176)
+> DOI: [10.5281/zenodo.17503176](https://zenodo.org/records/17516604)
 
 ---
 
@@ -419,7 +419,7 @@ If you use this pipeline in your research, please cite it as follows:
 
 > **Abbasi, M.H.**, & **Adeli, E.** (2025). *fMRI Processing Pipeline: A lightweight, end-to-end framework for BIDS-compatible fMRI preprocessing and quality control.*  
 > Stanford Translational AI Lab, Stanford University. Zenodo.  
-> [https://doi.org/10.5281/zenodo.17503176](https://doi.org/10.5281/zenodo.17503176)
+> [[10.5281/zenodo.17503176](https://zenodo.org/records/17516604)](https://zenodo.org/records/17516604)
 
 ```bibtex
 @software{abbasi2025fmri,
@@ -428,7 +428,7 @@ If you use this pipeline in your research, please cite it as follows:
   year         = {2025},
   institution  = {Stanford Translational AI Lab, Stanford University},
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.17516368},
-  url          = {https://doi.org/10.5281/zenodo.17516368}
+  doi          = {10.5281/zenodo.17516604},
+  url          = {https://doi.org/10.5281/zenodo.17516604}
 }
 ```
